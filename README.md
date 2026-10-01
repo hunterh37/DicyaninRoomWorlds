@@ -1,5 +1,7 @@
 # DicyaninRoomWorlds
 
+![DicyaninRoomWorlds: scan a room, generate a themed world](docs/hero.png)
+
 [![CI](https://github.com/hunterh37/DicyaninRoomWorlds/actions/workflows/ci.yml/badge.svg)](https://github.com/hunterh37/DicyaninRoomWorlds/actions/workflows/ci.yml)
 ![Platforms](https://img.shields.io/badge/platforms-visionOS%202%20%7C%20iOS%2018%20%7C%20macOS%2015-black)
 ![Swift](https://img.shields.io/badge/Swift-6.0-orange)
@@ -16,6 +18,28 @@ Scan a room on Vision Pro (or a LiDAR iPhone), then generate a themed 3D world f
 | ![](docs/screenshots/roomworlds-forest.png) | ![](docs/screenshots/roomworlds-desert.png) | ![](docs/screenshots/roomworlds-tundra.png) |
 
 Neon City: ![](docs/screenshots/roomworlds-neon.png)
+
+## Features
+
+| Area | Feature | API | Platforms |
+|---|---|---|---|
+| Scan | Scene reconstruction with classification, plane detection, room tracking | `RoomScanner` | visionOS |
+| Scan | Live labeled mesh preview and coverage meter | `scanner.previewRoot`, `ScanCoverage` | visionOS |
+| Scan | Import iPhone/iPad LiDAR meshes | `RoomScan(meshAnchors:)` | iOS |
+| Scan | Synthetic living room for tests and the simulator | `SyntheticRoom`, `scanner.loadSynthetic()` | all |
+| Analysis | Floor and ceiling height, Manhattan axis | `RoomAnalyzer` | all |
+| Analysis | Walls, windows and doors | `RoomModel.walls`, `.openings` | all |
+| Analysis | Measured boxes with 19 archetypes (sofa, bed, desk, shelf, tv, plant...) | `room.objects(_:)` | all |
+| Analysis | Floor occupancy grid with clearance, A* and spawn points | `room.grid` | all |
+| Generation | 70 parametric low-poly blueprints fitted to measured size, seat height and facing | `AssetLibrary`, `AssetBlueprint` | all |
+| Generation | 5 themes: cozy, enchanted forest, neon city, desert ruins, frozen tundra | `WorldTheme` | all |
+| Generation | Boundary pieces, door and window portals, terrain, Poisson-disk decor scatter | `WorldGenerator` | all |
+| Generation | Deterministic by seed, Codable JSON output for save and share | `WorldSpec` | all |
+| RealityKit | Entity tree in the ARKit world frame, sun, optional sky | `WorldEntityBuilder` | all |
+| RealityKit | ECS components linking each entity to its real object and surface height | `RoomWorldComponent`, `WorldSurfaceComponent` | all |
+| RealityKit | Box colliders, optional static physics bodies, floor collider | `Options.collisions`, `.physicsBodies` | all |
+| RealityKit | Decor batched per 2.5 m tile, unlit mode | `Options.batchDecor`, `.chunkSize`, `.unlit` | all |
+| Extensibility | Custom blueprints and themes registered at runtime | `lib.register(_:)` | all |
 
 - visionOS 2+, iOS 18+, macOS 15+ (analysis, generation and RealityKit building run everywhere; scanning is visionOS)
 - swift-tools 6.0, strict concurrency, no dependencies
@@ -131,7 +155,7 @@ Formulas, parameters and references: [docs/ALGORITHMS.md](docs/ALGORITHMS.md).
 | `RealityKit/` | `WorldEntityBuilder`, sun and sky, scan preview |
 | `Platform/` | `RoomScanner` (visionOS), ARKit mesh and plane conversion (visionOS, iOS) |
 
-Screenshots are rendered offscreen by the `RoomWorldsGallery` target in [DicyaninPackages/RenderGallery](https://github.com/hunterh37/DicyaninPackages).
+The hero image composites these screenshots with vector art. Screenshots are rendered offscreen by the `RoomWorldsGallery` target in [DicyaninPackages/RenderGallery](https://github.com/hunterh37/DicyaninPackages).
 
 ## License
 
