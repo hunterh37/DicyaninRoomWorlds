@@ -80,23 +80,27 @@ public extension ScanPlane {
         var lo = SIMD2<Float>(repeating: .infinity), hi = SIMD2<Float>(repeating: -.infinity)
         for p in pts { let q = SIMD2(simd_dot(p - c0, u), simd_dot(p - c0, v)); lo = simd_min(lo, q); hi = simd_max(hi, q) }
         let mid = (lo + hi) / 2
-        let label: SurfaceLabel
-        if #available(visionOS 26.0, *) {
-            label = SurfaceLabel(arkitRaw: a.surfaceClassification.rawValue)
-        } else {
-            switch a.classification {
-            case .wall: label = .wall
-            case .floor: label = .floor
-            case .ceiling: label = .ceiling
-            case .table: label = .table
-            case .seat: label = .seat
-            case .window: label = .window
-            case .door: label = .door
-            default: label = .none
-            }
-        }
+        var label = Self.legacyLabel(a)
+        #if compiler(>=6.2)
+        if #available(visionOS 26.0, *) { label = SurfaceLabel(arkitRaw: a.surfaceClassification.rawValue) }
+        #endif
         self.init(id: a.id, label: label, center: c0 + u * mid.x + v * mid.y, normal: n, widthAxis: u,
                   width: hi.x - lo.x, height: hi.y - lo.y)
+    }
+
+    @MainActor
+    @available(visionOS, deprecated: 26.0)
+    private static func legacyLabel(_ a: PlaneAnchor) -> SurfaceLabel {
+        switch a.classification {
+        case .wall: return .wall
+        case .floor: return .floor
+        case .ceiling: return .ceiling
+        case .table: return .table
+        case .seat: return .seat
+        case .window: return .window
+        case .door: return .door
+        default: return .none
+        }
     }
 }
 #endif
