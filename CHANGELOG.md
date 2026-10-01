@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 (unreleased)
+## 1.1.0 (2026-10-01)
 
 - Stable IDs. Objects, walls and openings are named by kind and quantized position (`sofa@1_-11`, `wall90@12_0`, `door@-6_3`) instead of list index. Adding or removing one object no longer renumbers the others, so their blueprint variants and seeds stay put. IDs from 1.0 scans change once.
 - Theme JSON. `MaterialRole` and `Archetype` are `CodingKeyRepresentable`, so `palette` and `furniture` encode as objects keyed by name and `WorldSpec.encoded()` is byte-stable. 1.0 files (alternating key/value arrays) still decode. Optional theme and terrain fields default when missing.
