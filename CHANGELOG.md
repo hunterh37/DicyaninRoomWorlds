@@ -1,5 +1,10 @@
 # Changelog
 
+## 1.0.1 (2026-10-01)
+
+- Builds with Xcode 16 (Swift 6.1, visionOS 2 and iOS 18 SDKs). 1.0.0 required Xcode 26.
+- CI: macOS tests plus iOS and visionOS builds.
+
 ## 1.0.0 (2026-10-01)
 
 First release.
