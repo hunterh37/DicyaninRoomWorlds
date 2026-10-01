@@ -43,7 +43,7 @@ Neon City: ![](docs/screenshots/roomworlds-neon.png)
 
 - visionOS 2+, iOS 18+, macOS 15+ (analysis, generation and RealityKit building run everywhere; scanning is visionOS)
 - swift-tools 6.0, strict concurrency, no dependencies
-- 23 tests on a synthetic, rotated, noisy room (`swift test`)
+- 34 tests on a synthetic, rotated, noisy room, labeled and unlabeled (`swift test`)
 
 ## Installation
 
@@ -51,7 +51,7 @@ Swift Package Manager:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/hunterh37/DicyaninRoomWorlds.git", from: "1.0.0")
+    .package(url: "https://github.com/hunterh37/DicyaninRoomWorlds.git", from: "1.1.0")
 ],
 targets: [
     .target(name: "MyApp", dependencies: ["DicyaninRoomWorlds"])
@@ -95,7 +95,7 @@ In an `ImmersiveSpace`, add `world` with an identity transform: entities are in 
 
 Simulator: `SceneReconstructionProvider` is unsupported there. Call `scanner.loadSynthetic()` to get a sample living room.
 
-iPhone/iPad LiDAR: run `ARWorldTrackingConfiguration` with `sceneReconstruction = .meshWithClassification`, then `RoomScan(meshAnchors: frame.anchors.compactMap { $0 as? ARMeshAnchor })`.
+iPhone/iPad LiDAR: run `ARWorldTrackingConfiguration` with `sceneReconstruction = .meshWithClassification`, then `RoomScan(meshAnchors: frame.anchors.compactMap { $0 as? ARMeshAnchor })`. Plain `.mesh` (no classification) also works: the analyzer infers floor, ceiling and walls from geometry and classifies objects by shape.
 
 ## Pure Swift use (any platform, tests, servers)
 
@@ -103,7 +103,7 @@ iPhone/iPad LiDAR: run `ARWorldTrackingConfiguration` with `sceneReconstruction 
 let scan = try RoomScan.decode(savedData)                 // or SyntheticRoom.scan()
 let room = RoomAnalyzer().analyze(scan)
 room.objects(.sofa).first?.box.size                       // measured width, height, depth
-room.grid.path(from: a, to: b, radius: 0.25)              // walkable path around real furniture
+room.grid.path(from: a, to: b, radius: 0.25, smooth: true) // walkable path around real furniture
 let spec = WorldGenerator().generate(room: room, theme: .desertRuins, seed: 7)
 let json = try spec.encoded()
 ```
@@ -112,7 +112,8 @@ let json = try spec.encoded()
 
 - Every entity carries `RoomWorldComponent` (role, blueprint, `sourceID` of the real object, archetype). Furniture stand-ins carry `WorldSurfaceComponent` with the real seat or table-top height.
 - Furniture and boundary pieces get static box colliders sized to the real objects (`Options.collisions`, `physicsBodies`), and the terrain gets a floor collider.
-- `spec.spawnPoints` are farthest-point samples on walkable floor. `room.grid.isWalkable`, `clearance(at:)` and `path(from:to:)` handle NPC movement around real furniture.
+- `spec.spawnPoints` are farthest-point samples on walkable floor. `room.grid.isWalkable`, `clearance(at:)` and `path(from:to:smooth:)` handle NPC movement around real furniture.
+- Object, wall and opening IDs come from kind and position, so a rescan that adds one object keeps every other stand-in, variant and seed.
 - Decor is batched into one mesh per 2.5 m tile. The sample living room builds to 80 to 125 submeshes and under 5k triangles per theme; analysis of a 95k-triangle scan takes about 50 ms (release, M-series Mac).
 
 ## Assets

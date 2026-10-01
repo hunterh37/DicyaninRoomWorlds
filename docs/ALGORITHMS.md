@@ -15,6 +15,10 @@ Third-party visionOS apps get no camera frames (enterprise entitlement only), so
 
 The mesh labels are per face and noisy at object boundaries; furniture is often half labeled (a sofa seat as `seat`, its backrest as `none`). Chunks share no vertices across seams. The pipeline below is built around those two facts.
 
+## 0. Unclassified scans
+
+When a scan holds under 1 m^2 of `wall` and `floor` faces, labels are inferred before step 1: up-facing faces within 5 cm of the floor mode become `floor`, down-facing faces at least 1.9 m up become `ceiling`, and vertical faces at least 1.9 m up become `wall` (tall furniture rarely reaches that band, and the wall histogram in step 2 needs only the upper band). Objects are then classified on geometry alone, without the label term and without `clutter`.
+
 ## 1. Room frame
 
 Floor height is the area-weighted median height of up-facing (`n.y > 0.85`) `floor` faces. Without labels it is the lowest histogram mode holding at least 35% of the peak mass of all up-facing area. Ceiling height is the same over down-facing `ceiling` faces, else the 98th percentile of wall height.
@@ -65,7 +69,7 @@ Footprint sides are sorted, so the score does not depend on which side is the fr
 
 ## 6. Floor grid
 
-A 10 cm grid in the Manhattan frame. Cells inside the outline and within 30 cm of a scanned floor face are floor; object footprints standing on the floor are obstacles; walls are stroked 12 cm wide. A two-pass 8-neighbour chamfer transform (Borgefors 1986) gives each floor cell its clearance to the nearest non-floor cell. On top: `isWalkable(radius:)`, A* with an octile heuristic and no corner cutting, and farthest-point spawn sampling seeded at the most open cell.
+A 10 cm grid in the Manhattan frame, stored as one byte per cell; clearance is recomputed on decode. Cells inside the outline and within 30 cm of a scanned floor face are floor; object footprints standing on the floor are obstacles; walls are stroked 12 cm wide. A two-pass 8-neighbour chamfer transform (Borgefors 1986) gives each floor cell its clearance to the nearest non-floor cell. On top: `isWalkable(radius:)`, A* with an octile heuristic and no corner cutting, optional string pulling (keep a waypoint only when the next one is out of sight, line of sight sampled at half-cell steps against the agent radius), and farthest-point spawn sampling seeded at the most open cell.
 
 ## 7. Fitting assets to measured objects
 
@@ -92,7 +96,7 @@ The functional surface anchor matters for mixed reality: a stand-in sofa's seat 
 - Terrain: a triangulated grid over the outline plus an apron. Inside the room `h = bump * (2 fbm - 1)` with bump at most 1.2 cm, so walkable ground matches the real floor. Outside, `h = rim * smoothstep(d / apron) * (0.6 + 0.4 fbm)` raises hills, dunes or drifts past the walls.
 - Decor: Bridson Poisson-disk samples (radius `0.35 / sqrt(total density)`) restricted to floor cells, then per-rule clearance and an openness term `p = o c + (1 - o)(1 - c)` (c = normalized clearance) that pushes mushrooms toward edges and grass into the open. Decor is non-colliding and batched per 2.5 m tile.
 
-Every random choice uses SplitMix64 streams derived from (seed, stable ID), so changing one object does not reshuffle the rest of the world.
+Every random choice uses SplitMix64 streams derived from (seed, stable ID), so changing one object does not reshuffle the rest of the world. IDs are kind plus position quantized to 20 cm (walls: facing in 15 degree steps plus plane offset), with a `#n` suffix on collisions. An object whose center crosses a 20 cm boundary between scans gets a new ID.
 
 ## Comparison with published approaches
 

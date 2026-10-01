@@ -3,7 +3,7 @@ import simd
 
 /// Material role. Themes map each role to a concrete material, so one blueprint renders
 /// as oak in a cottage and as chrome in a neon city.
-public enum MaterialRole: String, Codable, Sendable, CaseIterable, Hashable {
+public enum MaterialRole: String, Codable, CodingKeyRepresentable, Sendable, CaseIterable, Hashable {
     case primary, secondary, accent, trim, soft, metal, glass, glow
     case stone, wood, foliage, foliageAlt, bark, ground, groundAlt, water, snow, crystal
 }

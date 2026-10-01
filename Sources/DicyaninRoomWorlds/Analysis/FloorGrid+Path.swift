@@ -4,7 +4,9 @@ import simd
 public extension FloorGrid {
     /// A* over walkable cells (8-connected, octile heuristic). Returns world XZ waypoints
     /// from `start` to `goal`, or nil when unreachable for an agent of `radius`.
-    func path(from start: SIMD2<Float>, to goal: SIMD2<Float>, radius: Float = 0.25) -> [SIMD2<Float>]? {
+    /// `smooth` drops every waypoint that has line of sight past it (string pulling), which turns
+    /// the cell staircase into a few straight legs.
+    func path(from start: SIMD2<Float>, to goal: SIMD2<Float>, radius: Float = 0.25, smooth: Bool = false) -> [SIMD2<Float>]? {
         guard let s = cellIndex(start), let g = cellIndex(goal) else { return nil }
         func ok(_ c: Int, _ r: Int) -> Bool {
             c >= 0 && r >= 0 && c < columns && r < rows && cells[r * columns + c] == .floor && clearance[r * columns + c] >= radius
@@ -49,7 +51,27 @@ public extension FloorGrid {
         var pts = cellsPath.reversed().map { cellCenter($0 % columns, $0 / columns) }
         pts[0] = start
         pts[pts.count - 1] = goal
-        return pts
+        return smooth ? simplify(pts, radius: radius) : pts
+    }
+
+    /// True when every point on segment a-b, sampled at half-cell steps, is walkable for `radius`.
+    func hasLineOfSight(_ a: SIMD2<Float>, _ b: SIMD2<Float>, radius: Float = 0.25) -> Bool {
+        let n = max(1, Int((simd_distance(a, b) / (cellSize * 0.5)).rounded(.up)))
+        for i in 0...n where !isWalkable(a + (b - a) * (Float(i) / Float(n)), radius: radius) { return false }
+        return true
+    }
+
+    /// Greedy string pulling: from each kept waypoint, jump to the farthest later one in sight.
+    func simplify(_ pts: [SIMD2<Float>], radius: Float = 0.25) -> [SIMD2<Float>] {
+        guard pts.count > 2 else { return pts }
+        var out = [pts[0]], i = 0
+        while i < pts.count - 1 {
+            var j = pts.count - 1
+            while j > i + 1 && !hasLineOfSight(pts[i], pts[j], radius: radius) { j -= 1 }
+            out.append(pts[j])
+            i = j
+        }
+        return out
     }
 }
 

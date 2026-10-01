@@ -15,6 +15,10 @@ public struct RoomAnalyzer: Sendable {
         /// Floor grid cell size, meters.
         public var gridCell: Float = 0.1
         public var classifier: ArchetypeClassifier = ArchetypeClassifier()
+        /// When the scan has under 1 m^2 of wall and floor labels (iOS `.mesh` without
+        /// classification, some recorded scans), label floor, ceiling and upper wall faces from
+        /// geometry and classify objects by shape alone.
+        public var inferMissingLabels: Bool = true
         public init() {}
     }
 
@@ -23,13 +27,14 @@ public struct RoomAnalyzer: Sendable {
     public init(options: Options = Options()) { self.options = options }
 
     public func analyze(_ scan: RoomScan) -> RoomModel {
-        let faces = FaceSet(scan: scan)
+        var faces = FaceSet(scan: scan)
+        let inferred = options.inferMissingLabels && Self.inferStructure(&faces, planes: scan.planes)
         let frame = RoomFrame.estimate(faces, planes: scan.planes)
         let walls = WallExtractor().extract(faces, frame: frame, planes: scan.planes)
         let openings = WallExtractor().openings(faces, frame: frame, walls: walls)
         let outline = floorOutline(faces, frame: frame, walls: walls, planes: scan.planes)
         let center = outline.isEmpty ? SIMD2<Float>.zero : outline.reduce(.zero, +) / Float(outline.count)
-        let objects = detectObjects(faces, frame: frame, walls: walls, outline: outline, center: center)
+        let objects = detectObjects(faces, frame: frame, walls: walls, outline: outline, center: center, ignoreLabels: inferred)
         let grid = buildGrid(faces, frame: frame, walls: walls, outline: outline, objects: objects)
         return RoomModel(floorY: frame.floorY, ceilingY: frame.ceilingY, manhattanYaw: frame.manhattanYaw,
                          manhattanConfidence: frame.manhattanConfidence, walls: walls, openings: openings,
@@ -37,6 +42,24 @@ public struct RoomAnalyzer: Sendable {
     }
 
     // MARK: Stages
+
+    /// Geometric labels for unclassified scans. Floor: up-facing faces within 5 cm of the floor
+    /// mode. Ceiling: down-facing faces 1.9 m or more above it. Wall: vertical faces 1.9 m or more
+    /// above the floor, a band that tall furniture rarely reaches. Returns true when it relabeled.
+    static func inferStructure(_ faces: inout FaceSet, planes: [ScanPlane]) -> Bool {
+        var labeled: Float = 0
+        for i in 0..<faces.count where faces.label[i] == .wall || faces.label[i] == .floor { labeled += faces.area[i] }
+        guard labeled < 1 else { return false }
+        let floorY = RoomFrame.estimate(faces, planes: planes).floorY
+        var changed = false
+        for i in 0..<faces.count where faces.label[i] == .none {
+            let n = faces.normal[i], y = faces.centroid[i].y - floorY
+            if n.y > 0.85 && abs(y) < 0.05 { faces.label[i] = .floor; changed = true }
+            else if n.y < -0.85 && y >= 1.9 { faces.label[i] = .ceiling; changed = true }
+            else if abs(n.y) < 0.3 && y >= 1.9 { faces.label[i] = .wall; changed = true }
+        }
+        return changed
+    }
 
     func floorOutline(_ faces: FaceSet, frame: RoomFrame, walls: [WallSegment], planes: [ScanPlane]) -> [SIMD2<Float>] {
         var pts: [SIMD2<Float>] = []
@@ -54,7 +77,8 @@ public struct RoomAnalyzer: Sendable {
         return Polygon2D.convexHull(pts)
     }
 
-    func detectObjects(_ faces: FaceSet, frame: RoomFrame, walls: [WallSegment], outline: [SIMD2<Float>], center: SIMD2<Float>) -> [DetectedObject] {
+    func detectObjects(_ faces: FaceSet, frame: RoomFrame, walls: [WallSegment], outline: [SIMD2<Float>], center: SIMD2<Float>,
+                       ignoreLabels: Bool = false) -> [DetectedObject] {
         let floorY = frame.floorY, ceilY = frame.ceilingY
         func nearWall(_ p: SIMD3<Float>) -> Bool {
             let q = SIMD2(p.x, p.z)
@@ -82,7 +106,8 @@ public struct RoomAnalyzer: Sendable {
         var used: Set<String> = []
         for seg in segs.sorted(by: { ($0.area, $0.lo.x, $0.lo.z) > ($1.area, $1.lo.x, $1.lo.z) }) {
             guard let fit = fitter.fit(seg, faces: faces, frame: frame, walls: walls, roomCenter: center) else { continue }
-            let obs = ArchetypeClassifier.Observation(label: seg.label, size: fit.box.size, surface: fit.surfaceHeight, nearWall: fit.wallID != nil)
+            let obs = ArchetypeClassifier.Observation(label: seg.label, size: fit.box.size, surface: fit.surfaceHeight, nearWall: fit.wallID != nil,
+                                                      ignoresLabel: ignoreLabels)
             let ranked = options.classifier.classify(obs)
             guard let top = ranked.first else { continue }
             let id = Self.stableID(top.archetype.rawValue, at: fit.box.center, used: &used)

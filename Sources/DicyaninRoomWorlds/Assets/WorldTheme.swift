@@ -49,6 +49,19 @@ public struct TerrainStyle: Codable, Sendable, Hashable {
     /// How far the terrain extends past the walls, meters.
     public var apron: Float = 1.2
     public init() {}
+
+    enum CodingKeys: String, CodingKey { case cell, bump, rimHeight, patchScale, patchCoverage, apron }
+
+    /// Missing keys keep their defaults, so hand- or LLM-written JSON can set only what it changes.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        cell = try c.decodeIfPresent(Float.self, forKey: .cell) ?? cell
+        bump = try c.decodeIfPresent(Float.self, forKey: .bump) ?? bump
+        rimHeight = try c.decodeIfPresent(Float.self, forKey: .rimHeight) ?? rimHeight
+        patchScale = try c.decodeIfPresent(Float.self, forKey: .patchScale) ?? patchScale
+        patchCoverage = try c.decodeIfPresent(Float.self, forKey: .patchCoverage) ?? patchCoverage
+        apron = try c.decodeIfPresent(Float.self, forKey: .apron) ?? apron
+    }
 }
 
 public struct SkyStyle: Codable, Sendable, Hashable {
@@ -98,8 +111,59 @@ public struct WorldTheme: Codable, Sendable, Identifiable, Hashable {
         self.door = door; self.window = window; self.decor = decor; self.terrain = terrain; self.sky = sky; self.ceiling = ceiling
     }
 
+    enum CodingKeys: String, CodingKey {
+        case id, name, palette, furniture, boundary, boundarySpacing, boundaryDepth, boundaryHeight, boundaryJitter
+        case door, window, decor, terrain, sky, ceiling
+    }
+
     /// Material for `role`, falling back to `primary` then neutral gray.
     public func material(_ role: MaterialRole) -> MaterialStyle {
         palette[role] ?? palette[.primary] ?? MaterialStyle(0x9A9A9A)
+    }
+}
+
+extension WorldTheme {
+    /// Palette and furniture encode as JSON objects keyed by role and archetype name (1.1).
+    /// 1.0 files, which stored them as alternating `[key, value, ...]` arrays, still decode.
+    /// Only `id`, `name`, `palette`, `boundary` and `sky` are required.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let d = WorldTheme(id: "", name: "", palette: [:], furniture: [:], boundary: [], door: nil, window: nil, decor: [],
+                           sky: SkyStyle(zenith: 0, horizon: 0, sunColor: 0))
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        palette = try c.decodeEnumKeyed([MaterialRole: MaterialStyle].self, forKey: .palette)
+        furniture = c.contains(.furniture) ? try c.decodeEnumKeyed([Archetype: [String]].self, forKey: .furniture) : [:]
+        boundary = try c.decode([String].self, forKey: .boundary)
+        boundarySpacing = try c.decodeIfPresent(Float.self, forKey: .boundarySpacing) ?? d.boundarySpacing
+        boundaryDepth = try c.decodeIfPresent(ClosedRange<Float>.self, forKey: .boundaryDepth) ?? d.boundaryDepth
+        boundaryHeight = try c.decodeIfPresent(ClosedRange<Float>.self, forKey: .boundaryHeight) ?? d.boundaryHeight
+        boundaryJitter = try c.decodeIfPresent(Float.self, forKey: .boundaryJitter) ?? d.boundaryJitter
+        door = try c.decodeIfPresent(String.self, forKey: .door)
+        window = try c.decodeIfPresent(String.self, forKey: .window)
+        decor = try c.decodeIfPresent([DecorRule].self, forKey: .decor) ?? []
+        terrain = try c.decodeIfPresent(TerrainStyle.self, forKey: .terrain) ?? TerrainStyle()
+        sky = try c.decode(SkyStyle.self, forKey: .sky)
+        ceiling = try c.decodeIfPresent(Ceiling.self, forKey: .ceiling) ?? .open
+    }
+}
+
+extension KeyedDecodingContainer {
+    /// Decodes a dictionary keyed by a String-backed enum from a JSON object, or from the
+    /// alternating `[key, value, ...]` array that 1.0 wrote. Unknown keys are skipped.
+    func decodeEnumKeyed<EnumKey: RawRepresentable & Hashable & Decodable, V: Decodable>(_ type: [EnumKey: V].Type, forKey key: Key) throws -> [EnumKey: V]
+    where EnumKey.RawValue == String {
+        var out: [EnumKey: V] = [:]
+        if let obj = try? decode([String: V].self, forKey: key) {
+            for (k, v) in obj { if let kk = EnumKey(rawValue: k) { out[kk] = v } }
+            return out
+        }
+        var arr = try nestedUnkeyedContainer(forKey: key)
+        while !arr.isAtEnd {
+            let k = try arr.decode(String.self)
+            let v = try arr.decode(V.self)
+            if let kk = EnumKey(rawValue: k) { out[kk] = v }
+        }
+        return out
     }
 }

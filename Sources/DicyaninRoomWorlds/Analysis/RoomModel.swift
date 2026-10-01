@@ -37,7 +37,7 @@ public struct FittedBox: Codable, Sendable, Hashable {
 }
 
 /// Furniture and fixture roles an object can play. The asset library maps each to blueprints.
-public enum Archetype: String, Codable, Sendable, CaseIterable, Hashable {
+public enum Archetype: String, Codable, CodingKeyRepresentable, Sendable, CaseIterable, Hashable {
     case diningTable, coffeeTable, sideTable, desk, counter
     case chair, armchair, sofa, stool, bed
     case lowCabinet, wardrobe, shelf, appliance, tallAppliance, tv, plant, stairs

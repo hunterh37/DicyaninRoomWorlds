@@ -33,6 +33,8 @@ public final class RoomScanner {
     public var limitToCurrentRoom = true
 
     @ObservationIgnored private let session: ARKitSession
+    @ObservationIgnored private let ownsSession: Bool
+    @ObservationIgnored private var pendingPreview: Set<UUID> = []
     @ObservationIgnored private var meshes: [UUID: ScanMesh] = [:]
     @ObservationIgnored private var planes: [UUID: ScanPlane] = [:]
     @ObservationIgnored private var previews: [UUID: ModelEntity] = [:]
@@ -41,9 +43,19 @@ public final class RoomScanner {
     @ObservationIgnored private var roomProvider: RoomTrackingProvider?
     @ObservationIgnored private var coverageDirty = false
 
+    /// Uses a private `ARKitSession`. `stop()` stops it.
+    public init() {
+        self.session = ARKitSession()
+        self.ownsSession = true
+        previewRoot.name = "RoomScannerPreview"
+    }
+
     /// Pass the app's shared `ARKitSession` when it already runs hand tracking or other providers.
-    public init(session: ARKitSession = ARKitSession()) {
+    /// `stop()` then only stops consuming updates and leaves the session running, since
+    /// `ARKitSession.stop()` would also stop the app's other providers.
+    public init(session: ARKitSession) {
         self.session = session
+        self.ownsSession = false
         previewRoot.name = "RoomScannerPreview"
     }
 
@@ -90,9 +102,14 @@ public final class RoomScanner {
         tasks.append(Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(1))
-                guard let self, self.coverageDirty else { continue }
+                guard let self else { return }
+                self.flushPendingPreviews()
+                guard self.coverageDirty else { continue }
                 self.coverageDirty = false
-                self.coverage = ScanCoverage.measure(RoomScan(source: "visionos", meshes: Array(self.meshes.values)))
+                // Measuring walks every face; keep it off the main actor.
+                let scan = RoomScan(source: "visionos", meshes: Array(self.meshes.values))
+                let cov = await Task.detached(priority: .utility) { ScanCoverage.measure(scan) }.value
+                if self.state == .scanning { self.coverage = cov }
             }
         })
     }
@@ -101,13 +118,14 @@ public final class RoomScanner {
     public func stop() {
         tasks.forEach { $0.cancel() }
         tasks.removeAll()
-        session.stop()
+        pendingPreview.removeAll()
+        if ownsSession { session.stop() }
         if state == .scanning { state = .stopped }
     }
 
     /// Clears captured data and the preview.
     public func reset() {
-        meshes.removeAll(); planes.removeAll(); lastPreview.removeAll()
+        meshes.removeAll(); planes.removeAll(); lastPreview.removeAll(); pendingPreview.removeAll()
         previews.values.forEach { $0.removeFromParent() }
         previews.removeAll()
         coverage = ScanCoverage(); meshCount = 0
@@ -147,10 +165,11 @@ public final class RoomScanner {
 
     /// Snapshot, analysis and world generation off the main actor.
     public func makeWorld(theme: WorldTheme, seed: UInt64 = UInt64.random(in: 1...UInt64.max),
-                          library: AssetLibrary = .standard, options: WorldGenerator.Options = .init()) async -> WorldSpec {
+                          library: AssetLibrary = .standard, options: WorldGenerator.Options = .init(),
+                          analyzerOptions: RoomAnalyzer.Options = .init()) async -> WorldSpec {
         let scan = snapshot()
         return await Task.detached(priority: .userInitiated) {
-            let model = RoomAnalyzer().analyze(scan)
+            let model = RoomAnalyzer(options: analyzerOptions).analyze(scan)
             return WorldGenerator(library: library, options: options).generate(room: model, theme: theme, seed: seed)
         }.value
     }
@@ -166,15 +185,27 @@ public final class RoomScanner {
         case .removed:
             meshes.removeValue(forKey: update.anchor.id)
             previews.removeValue(forKey: update.anchor.id)?.removeFromParent()
+            pendingPreview.remove(update.anchor.id)
         }
         meshCount = meshes.count
         coverageDirty = true
     }
 
+    private func flushPendingPreviews() {
+        guard showsPreview, !pendingPreview.isEmpty else { return }
+        for id in pendingPreview { if let m = meshes[id] { refreshPreview(m, force: true) } }
+        pendingPreview.removeAll()
+    }
+
     private func refreshPreview(_ m: ScanMesh, force: Bool) {
         guard showsPreview else { return }
         let now = Date()
-        if !force, let last = lastPreview[m.id], now.timeIntervalSince(last) < previewInterval { return }
+        if !force, let last = lastPreview[m.id], now.timeIntervalSince(last) < previewInterval {
+            // Throttled: rebuild on the next tick so the final update of an anchor is never lost.
+            pendingPreview.insert(m.id)
+            return
+        }
+        pendingPreview.remove(m.id)
         lastPreview[m.id] = now
         guard let e = try? ScanPreview.entity(for: m, opacity: previewOpacity) else { return }
         previews[m.id]?.removeFromParent()

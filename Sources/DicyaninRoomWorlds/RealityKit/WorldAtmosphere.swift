@@ -69,10 +69,12 @@ public enum WorldAtmosphere {
             let c = t * (1 - f) + b * f
             px[y * 4] = UInt8(c.x * 255); px[y * 4 + 1] = UInt8(c.y * 255); px[y * 4 + 2] = UInt8(c.z * 255)
         }
-        let cs = CGColorSpaceCreateDeviceRGB()
-        let ctx = CGContext(data: &px, width: 1, height: h, bitsPerComponent: 8, bytesPerRow: 4, space: cs,
-                            bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue)!
-        return ctx.makeImage()!
+        // CGImage owns a copy of the pixels (a CGContext over &px would outlive the pointer).
+        let provider = CGDataProvider(data: Data(px) as CFData)!
+        return CGImage(width: 1, height: h, bitsPerComponent: 8, bitsPerPixel: 32, bytesPerRow: 4,
+                       space: CGColorSpace(name: CGColorSpace.sRGB)!,
+                       bitmapInfo: CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue),
+                       provider: provider, decode: nil, shouldInterpolate: true, intent: .defaultIntent)!
     }
 }
 #endif

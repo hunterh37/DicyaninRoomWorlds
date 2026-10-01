@@ -30,7 +30,8 @@ public struct WorldInstance: Codable, Sendable, Identifiable, Hashable {
 /// Serializable result of world generation. Small (no meshes): meshes are rebuilt
 /// deterministically from blueprints, sizes and seeds, so specs can be saved, synced or shared.
 public struct WorldSpec: Codable, Sendable {
-    public var version: Int = 1
+    /// 2 since 1.1: keyed theme dictionaries, byte-packed floor grid. Version 1 files still decode.
+    public var version: Int = 2
     public var seed: UInt64
     public var theme: WorldTheme
     public var room: RoomModel

@@ -27,6 +27,40 @@ public struct FloorGrid: Codable, Sendable {
         clearance = Array(repeating: 0, count: self.columns * self.rows)
     }
 
+    // MARK: Coding
+
+    enum CodingKeys: String, CodingKey { case origin, cellSize, yaw, columns, rows, cells, clearance }
+
+    /// Cells encode as one byte each (base64 in JSON). Clearance is derived data and is
+    /// recomputed on decode. 1.0 files (cells as a number array, clearance included) still decode.
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(origin, forKey: .origin)
+        try c.encode(cellSize, forKey: .cellSize)
+        try c.encode(yaw, forKey: .yaw)
+        try c.encode(columns, forKey: .columns)
+        try c.encode(rows, forKey: .rows)
+        try c.encode(Data(cells.map(\.rawValue)), forKey: .cells)
+    }
+
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(origin: try c.decode(SIMD2<Float>.self, forKey: .origin), cellSize: try c.decode(Float.self, forKey: .cellSize),
+                  yaw: try c.decode(Float.self, forKey: .yaw), columns: try c.decode(Int.self, forKey: .columns),
+                  rows: try c.decode(Int.self, forKey: .rows))
+        let decoded: [Cell]
+        if let bytes = try? c.decode(Data.self, forKey: .cells) {
+            decoded = bytes.map { Cell(rawValue: $0) ?? .outside }
+        } else {
+            decoded = try c.decode([Cell].self, forKey: .cells)
+        }
+        guard decoded.count == columns * rows else {
+            throw DecodingError.dataCorruptedError(forKey: .cells, in: c, debugDescription: "expected \(columns * rows) cells, got \(decoded.count)")
+        }
+        cells = decoded
+        computeClearance()
+    }
+
     // MARK: Coordinates
 
     /// World XZ to the grid frame (unrotated by `yaw`).

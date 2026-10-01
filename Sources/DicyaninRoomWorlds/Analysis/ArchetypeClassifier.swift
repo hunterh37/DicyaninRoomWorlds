@@ -45,8 +45,10 @@ public struct ArchetypeClassifier: Sendable {
         public var size: SIMD3<Float>
         public var surface: Float?
         public var nearWall: Bool
-        public init(label: SurfaceLabel, size: SIMD3<Float>, surface: Float?, nearWall: Bool) {
-            self.label = label; self.size = size; self.surface = surface; self.nearWall = nearWall
+        /// Score on geometry only (unclassified scans). `clutter` is then excluded.
+        public var ignoresLabel: Bool
+        public init(label: SurfaceLabel, size: SIMD3<Float>, surface: Float?, nearWall: Bool, ignoresLabel: Bool = false) {
+            self.label = label; self.size = size; self.surface = surface; self.nearWall = nearWall; self.ignoresLabel = ignoresLabel
         }
     }
 
@@ -54,7 +56,7 @@ public struct ArchetypeClassifier: Sendable {
         let long = max(o.size.x, o.size.z), short = min(o.size.x, o.size.z)
         let x = SIMD3(max(long, 0.02), max(short, 0.02), max(o.size.y, 0.02))
         let z = (SIMD3(log(x.x), log(x.y), log(x.z)) - SIMD3(log(p.size.x), log(p.size.y), log(p.size.z))) / p.sigma
-        var s = log(p.labels[o.label] ?? 0.01) - 0.5 * simd_length_squared(z)
+        var s = (o.ignoresLabel ? 0 : log(p.labels[o.label] ?? 0.01)) - 0.5 * simd_length_squared(z)
         if let mu = p.surface, let obs = o.surface {
             let d = (obs - mu) / p.surfaceSigma
             s -= 0.5 * min(d * d, 16)
@@ -65,11 +67,13 @@ public struct ArchetypeClassifier: Sendable {
 
     /// Candidates sorted by posterior probability.
     public func classify(_ o: Observation) -> [DetectedObject.Candidate] {
-        let scores = priors.map { logScore($0, o) }
+        let pool = o.ignoresLabel ? priors.filter { $0.archetype != .clutter } : priors
+        guard !pool.isEmpty else { return [] }
+        let scores = pool.map { logScore($0, o) }
         guard let mx = scores.max() else { return [] }
         let ex = scores.map { exp($0 - mx) }
         let z = ex.reduce(0, +)
-        return zip(priors, ex).map { DetectedObject.Candidate(archetype: $0.archetype, probability: $1 / z) }
+        return zip(pool, ex).map { DetectedObject.Candidate(archetype: $0.archetype, probability: $1 / z) }
             .sorted { $0.probability > $1.probability }
     }
 
