@@ -91,7 +91,14 @@ struct WallExtractor {
             }
         }
         walls = snapCorners(walls)
-        for i in walls.indices { walls[i].id = "wall_\(i)" }
+        var used: Set<String> = []
+        for i in walls.indices {
+            // Facing in 15 degree steps plus the plane offset quantized to 20 cm. Stable while the
+            // wall grows during a scan and when other walls appear, vanish or reorder.
+            let deg = Int((Yaw.facing(walls[i].normal) * 180 / .pi / 15).rounded()) * 15
+            let d = simd_dot(walls[i].midpoint, walls[i].normal)
+            walls[i].id = RoomAnalyzer.stableID("wall\(deg)", at: SIMD3(d, 0, 0), used: &used)
+        }
         return walls
     }
 
@@ -122,7 +129,8 @@ struct WallExtractor {
         let cand = faces.indices { faces.label[$0].isOpening }
         let segs = VoxelSegmenter(voxelSize: 0.1).segment(faces, candidates: cand).filter { $0.area >= 0.08 }
         var out: [WallOpening] = []
-        for seg in segs.sorted(by: { $0.area > $1.area }) {
+        var used: Set<String> = []
+        for seg in segs.sorted(by: { ($0.area, $0.lo.x, $0.lo.z) > ($1.area, $1.lo.x, $1.lo.z) }) {
             let ws = seg.faces.map { faces.area[$0] }
             let pts = seg.faces.map { SIMD2(faces.centroid[$0].x, faces.centroid[$0].z) }
             let c = pts.indices.reduce(SIMD2<Float>.zero) { $0 + pts[$1] * ws[$1] } / max(seg.area, 1e-6)
@@ -140,7 +148,7 @@ struct WallExtractor {
             guard s1 - s0 > 0.25, y1 - y0 > 0.25 else { continue }
             var center = anchor + tangent * (s0 + s1) / 2
             if let wall { center = wall.start + tangent * simd_dot(center - wall.start, tangent) }
-            out.append(WallOpening(id: "\(kind.rawValue)_\(out.count)", kind: kind, wallID: wall?.id, center: center,
+            out.append(WallOpening(id: RoomAnalyzer.stableID(kind.rawValue, at: SIMD3(center.x, 0, center.y), used: &used), kind: kind, wallID: wall?.id, center: center,
                                    width: s1 - s0, bottomY: y0, topY: y1, normal: normal))
         }
         return out
