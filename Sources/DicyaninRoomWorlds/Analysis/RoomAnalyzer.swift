@@ -79,16 +79,29 @@ public struct RoomAnalyzer: Sendable {
 
         let fitter = ObjectFitter()
         var out: [DetectedObject] = []
-        for seg in segs.sorted(by: { $0.area > $1.area }) {
+        var used: Set<String> = []
+        for seg in segs.sorted(by: { ($0.area, $0.lo.x, $0.lo.z) > ($1.area, $1.lo.x, $1.lo.z) }) {
             guard let fit = fitter.fit(seg, faces: faces, frame: frame, walls: walls, roomCenter: center) else { continue }
             let obs = ArchetypeClassifier.Observation(label: seg.label, size: fit.box.size, surface: fit.surfaceHeight, nearWall: fit.wallID != nil)
             let ranked = options.classifier.classify(obs)
             guard let top = ranked.first else { continue }
-            out.append(DetectedObject(id: "\(top.archetype.rawValue)_\(out.count)", label: seg.label, archetype: top.archetype,
+            let id = Self.stableID(top.archetype.rawValue, at: fit.box.center, used: &used)
+            out.append(DetectedObject(id: id, label: seg.label, archetype: top.archetype,
                                       box: fit.box, surfaceHeight: fit.surfaceHeight, area: seg.area, confidence: top.probability,
                                       wallID: fit.wallID, alternatives: Array(ranked.dropFirst().prefix(2))))
         }
         return out
+    }
+
+    /// ID from the kind and the XZ position quantized to 20 cm. Adding, removing or resizing one
+    /// object leaves every other ID (and so every per-object seed) unchanged. Collisions get a suffix.
+    static func stableID(_ kind: String, at p: SIMD3<Float>, used: inout Set<String>) -> String {
+        let q = SIMD2<Float>(p.x, p.z) / 0.2
+        let base = "\(kind)@\(Int((q.x).rounded()))_\(Int((q.y).rounded()))"
+        var id = base, k = 2
+        while used.contains(id) { id = "\(base)#\(k)"; k += 1 }
+        used.insert(id)
+        return id
     }
 
     func buildGrid(_ faces: FaceSet, frame: RoomFrame, walls: [WallSegment], outline: [SIMD2<Float>], objects: [DetectedObject]) -> FloorGrid {
