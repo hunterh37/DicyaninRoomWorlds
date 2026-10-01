@@ -1,0 +1,143 @@
+import Foundation
+import simd
+
+// Faithful low-poly furniture. Fits any scanned box; slab, leg and frame thickness stay metric.
+
+extension AssetBlueprint {
+    static let furniture: [AssetBlueprint] = [
+        AssetBlueprint("table.classic", name: "Table", tags: ["table"], size: [1.4, 0.75, 0.85], parts: [
+            PartSpec(.box, .primary, y: Span(.surf(-0.045), .surf())),
+            PartSpec(.box, .secondary, x: .fromLo(0.06, inset: 0.05), y: Span(.lo(), .surf(-0.045)), z: .fromLo(0.06, inset: 0.05), mirrorX: true, mirrorZ: true),
+            PartSpec(.box, .secondary, x: .inset(0.08), y: Span(.surf(-0.12), .surf(-0.045)), z: .fromLo(0.02, inset: 0.08), mirrorZ: true, when: [.minHeight(0.5)]),
+        ]),
+        AssetBlueprint("table.round", name: "Round table", tags: ["table"], size: [0.9, 0.75, 0.9], parts: [
+            PartSpec(.cyl(12), .primary, y: Span(.surf(-0.04), .surf())),
+            PartSpec(.cyl(8), .secondary, x: .centered(0.1), y: Span(.lo(0.03), .surf(-0.04)), z: .centered(0.1)),
+            PartSpec(.cyl(8, taper: 0.6), .secondary, x: .centeredFraction(0.55), y: Span(.lo(), .lo(0.05)), z: .centeredFraction(0.55)),
+        ]),
+        AssetBlueprint("desk.drawers", name: "Desk", tags: ["desk"], size: [1.4, 0.75, 0.7], parts: [
+            PartSpec(.box, .primary, y: Span(.surf(-0.04), .surf())),
+            PartSpec(.box, .secondary, x: Span(.lo(0.02), .f(0.34)), y: Span(.lo(), .surf(-0.04)), z: .inset(0.02)),
+            PartSpec(.box, .primary, x: Span(.lo(0.04), .f(0.32)), y: Span(.lo(0.05), .surf(-0.06)), z: .fromHi(0.012),
+                     repeating: RepeatRule(.y, pitch: 0.2, gap: 0.025)),
+            PartSpec(.box, .metal, x: Span(.f(0.14), .f(0.22)), y: Span(.lo(0.05), .surf(-0.06)), z: .fromHi(0.02, inset: -0.01),
+                     repeating: RepeatRule(.y, pitch: 0.2, gap: 0, from: 0.45, to: 0.55)),
+            PartSpec(.box, .secondary, x: .fromHi(0.04, inset: 0.02), y: Span(.lo(), .surf(-0.04)), z: .inset(0.02)),
+            PartSpec(.box, .secondary, x: Span(.f(0.34), .hi(0.06)), y: Span(.f(0.35), .surf(-0.04)), z: .fromLo(0.02, inset: 0.04)),
+        ]),
+        AssetBlueprint("counter.block", name: "Counter", tags: ["counter", "kitchen"], size: [2.0, 0.92, 0.62], parts: [
+            PartSpec(.box, .secondary, x: .inset(0.01), y: Span(.lo(0.08), .surf(-0.04)), z: Span(.lo(), .hi(0.03))),
+            PartSpec(.box, .trim, x: .inset(0.03), y: Span(.lo(), .lo(0.08)), z: Span(.lo(), .hi(0.07))),
+            PartSpec(.box, .primary, y: Span(.surf(-0.04), .surf())),
+            PartSpec(.box, .secondary, x: .inset(0.02), y: Span(.lo(0.11), .surf(-0.07)), z: .fromHi(0.02, inset: 0.025),
+                     repeating: RepeatRule(.x, pitch: 0.5, gap: 0.015)),
+            PartSpec(.box, .metal, x: .inset(0.02), y: Span(.surf(-0.14), .surf(-0.12)), z: .fromHi(0.02, inset: 0.005),
+                     repeating: RepeatRule(.x, pitch: 0.5, gap: 0, from: 0.4, to: 0.6)),
+        ]),
+        AssetBlueprint("chair.classic", name: "Chair", tags: ["chair"], size: [0.46, 0.88, 0.48], surface: 0.52, parts: [
+            PartSpec(.box, .primary, x: .inset(0.01), y: Span(.surf(-0.05), .surf()), z: Span(.lo(0.02), .hi(0.01))),
+            PartSpec(.box, .soft, x: .inset(0.04), y: Span(.surf(), .surf(0.03)), z: Span(.lo(0.08), .hi(0.04))),
+            PartSpec(.box, .secondary, x: .fromLo(0.04, inset: 0.03), y: Span(.lo(), .surf(-0.05)), z: .fromLo(0.04, inset: 0.04), mirrorX: true, mirrorZ: true),
+            PartSpec(.box, .secondary, x: .fromLo(0.04, inset: 0.03), y: Span(.surf(), .hi()), z: .fromLo(0.04, inset: 0.02), mirrorX: true, when: [.aboveSurface(0.12)]),
+            PartSpec(.box, .primary, x: .inset(0.05), y: Span(.hi(0.17), .hi(0.02)), z: .fromLo(0.025, inset: 0.03), rotation: [-6, 0, 0], when: [.aboveSurface(0.2)]),
+        ]),
+        AssetBlueprint("chair.armchair", name: "Armchair", tags: ["armchair"], size: [0.85, 0.9, 0.85], surface: 0.5, parts: [
+            PartSpec(.box, .secondary, x: .inset(0.02), y: Span(.lo(0.06), .surf(-0.1)), z: Span(.lo(0.02), .hi(0.02))),
+            PartSpec(.box, .soft, x: .inset(0.16), y: Span(.surf(-0.11), .surf()), z: Span(.lo(0.2), .hi(0.01))),
+            PartSpec(.box, .soft, x: .inset(0.15), y: Span(.surf(-0.11), .hi()), z: .fromLo(0.2, inset: 0.01), rotation: [-7, 0, 0], when: [.aboveSurface(0.15)]),
+            PartSpec(.box, .primary, x: .fromLo(0.15), y: Span(.lo(0.06), .surf(0.17)), z: Span(.lo(0.04), .hi())),
+            PartSpec(.box, .primary, x: .fromHi(0.15), y: Span(.lo(0.06), .surf(0.17)), z: Span(.lo(0.04), .hi())),
+            PartSpec(.cyl(6, taper: 0.7), .trim, x: .fromLo(0.05, inset: 0.05), y: Span(.lo(), .lo(0.06)), z: .fromLo(0.05, inset: 0.05), mirrorX: true, mirrorZ: true),
+        ]),
+        AssetBlueprint("sofa.cushions", name: "Sofa", tags: ["sofa"], size: [2.1, 0.85, 0.9], surface: 0.5, parts: [
+            PartSpec(.box, .secondary, x: .inset(0.02), y: Span(.lo(0.07), .surf(-0.12)), z: Span(.lo(0.02), .hi(0.02))),
+            PartSpec(.box, .soft, x: .inset(0.16), y: Span(.surf(-0.13), .surf()), z: Span(.lo(0.22), .hi(0.01)), repeating: RepeatRule(.x, pitch: 0.62, gap: 0.015)),
+            PartSpec(.box, .secondary, x: .inset(0.02), y: Span(.lo(0.07), .hi(0.04)), z: .fromLo(0.12, inset: 0.01)),
+            PartSpec(.box, .soft, x: .inset(0.16), y: Span(.surf(-0.02), .hi(0.02)), z: .fromLo(0.13, inset: 0.11), rotation: [-8, 0, 0],
+                     repeating: RepeatRule(.x, pitch: 0.62, gap: 0.015), when: [.aboveSurface(0.15)]),
+            PartSpec(.box, .primary, x: .fromLo(0.16), y: Span(.lo(0.07), .surf(0.16)), z: Span(.lo(0.01), .hi())),
+            PartSpec(.box, .primary, x: .fromHi(0.16), y: Span(.lo(0.07), .surf(0.16)), z: Span(.lo(0.01), .hi())),
+            PartSpec(.box, .accent, x: .fromLo(0.3, inset: 0.22), y: Span(.surf(), .surf(0.28)), z: .fromLo(0.12, inset: 0.15), rotation: [-12, 8, 4], when: [.minWidth(1.3), .aboveSurface(0.25)]),
+            PartSpec(.cyl(6, taper: 0.7), .trim, x: .fromLo(0.05, inset: 0.06), y: Span(.lo(), .lo(0.07)), z: .fromLo(0.05, inset: 0.06), mirrorX: true, mirrorZ: true),
+        ]),
+        AssetBlueprint("stool.round", name: "Stool", tags: ["stool"], size: [0.4, 0.65, 0.4], parts: [
+            PartSpec(.cyl(10), .primary, y: Span(.hi(0.05), .hi())),
+            PartSpec(.cyl(10), .soft, x: .inset(0.03), y: Span(.hi(), .hi(-0.025)), z: .inset(0.03)),
+            PartSpec(.cyl(6), .secondary, x: .centered(0.06), y: Span(.lo(0.03), .hi(0.05)), z: .centered(0.06)),
+            PartSpec(.cyl(10, taper: 0.5), .secondary, x: .centeredFraction(0.8), y: Span(.lo(), .lo(0.04)), z: .centeredFraction(0.8)),
+            PartSpec(.cyl(10), .metal, x: .centeredFraction(0.6), y: Span(.f(0.32), .f(0.32, 0.025)), z: .centeredFraction(0.6)),
+        ]),
+        AssetBlueprint("bed.frame", name: "Bed", tags: ["bed"], size: [1.6, 0.6, 2.05], surface: 0.95, parts: [
+            PartSpec(.box, .primary, y: Span(.lo(0.08), .surf(-0.2)), z: Span(.lo(0.06), .hi())),
+            PartSpec(.box, .soft, x: .inset(0.03), y: Span(.surf(-0.2), .surf()), z: Span(.lo(0.08), .hi(0.03))),
+            PartSpec(.box, .accent, x: .inset(0.015), y: Span(.surf(-0.17), .surf(0.02)), z: Span(.f(0.38), .hi(0.015))),
+            PartSpec(.box, .soft, x: .inset(0.12), y: Span(.surf(), .surf(0.12)), z: .fromLo(0.36, inset: 0.12), repeating: RepeatRule(.x, pitch: 0.75, gap: 0.08)),
+            PartSpec(.box, .primary, y: Span(.lo(), .hi()), z: .fromLo(0.07), when: [.aboveSurface(0.15)]),
+            PartSpec(.box, .secondary, x: .fromLo(0.06, inset: 0.03), y: Span(.lo(), .lo(0.08)), z: .fromLo(0.06, inset: 0.1), mirrorX: true, mirrorZ: true),
+        ]),
+        AssetBlueprint("cabinet.doors", name: "Cabinet", tags: ["cabinet"], size: [1.2, 0.85, 0.45], parts: [
+            PartSpec(.box, .secondary, x: .inset(0.01), y: Span(.lo(0.06), .hi(0.03)), z: Span(.lo(), .hi(0.02))),
+            PartSpec(.box, .primary, y: Span(.hi(0.03), .hi())),
+            PartSpec(.box, .trim, x: .inset(0.04), y: Span(.lo(), .lo(0.06)), z: Span(.lo(0.02), .hi(0.05))),
+            PartSpec(.box, .primary, x: .inset(0.02), y: Span(.lo(0.08), .hi(0.05)), z: .fromHi(0.02), repeating: RepeatRule(.x, pitch: 0.45, gap: 0.012)),
+            PartSpec(.sphere(segments: 6), .metal, x: .inset(0.02), y: Span(.hi(0.15), .hi(0.11)), z: .fromHi(0.03, inset: -0.02),
+                     repeating: RepeatRule(.x, pitch: 0.45, gap: 0, from: 0.82, to: 0.9)),
+        ]),
+        AssetBlueprint("wardrobe.tall", name: "Wardrobe", tags: ["wardrobe"], size: [1.1, 2.0, 0.6], parts: [
+            PartSpec(.box, .secondary, x: .inset(0.01), y: Span(.lo(0.08), .hi(0.06)), z: Span(.lo(), .hi(0.02))),
+            PartSpec(.box, .primary, y: Span(.hi(0.06), .hi())),
+            PartSpec(.box, .trim, x: .inset(0.03), y: Span(.lo(), .lo(0.08)), z: Span(.lo(0.02), .hi(0.04))),
+            PartSpec(.box, .primary, x: .inset(0.025), y: Span(.lo(0.1), .hi(0.08)), z: .fromHi(0.02), repeating: RepeatRule(.x, pitch: 0.5, gap: 0.01)),
+            PartSpec(.box, .metal, x: .inset(0.025), y: Span(.f(0.45), .f(0.6)), z: .fromHi(0.025, inset: -0.02),
+                     repeating: RepeatRule(.x, pitch: 0.5, gap: 0, from: 0.84, to: 0.9)),
+        ]),
+        AssetBlueprint("shelf.books", name: "Bookshelf", tags: ["shelf"], size: [0.9, 1.8, 0.35], parts: [
+            PartSpec(.box, .secondary, x: .fromLo(0.03), z: Span(.lo(), .hi())),
+            PartSpec(.box, .secondary, x: .fromHi(0.03), z: Span(.lo(), .hi())),
+            PartSpec(.box, .secondary, x: .inset(0.03), z: .fromLo(0.015)),
+            PartSpec(.box, .primary, x: .inset(0.03), y: Span(.lo(), .hi()), z: Span(.lo(0.015), .hi()),
+                     repeating: RepeatRule(.y, pitch: 0.36, gap: 0, from: 0, to: 0.08, maxCount: 8)),
+            PartSpec(.box, .primary, x: .inset(0.03), y: .fromHi(0.025), z: Span(.lo(0.015), .hi())),
+            PartSpec(.box, .accent, x: Span(.lo(0.05), .f(0.52)), y: .full, z: Span(.lo(0.04), .hi(0.04)),
+                     repeating: RepeatRule(.y, pitch: 0.36, gap: 0, from: 0.08, to: 0.72, maxCount: 8)),
+            PartSpec(.box, .soft, x: Span(.f(0.55), .hi(0.08)), y: .full, z: Span(.lo(0.05), .hi(0.05)),
+                     repeating: RepeatRule(.y, pitch: 0.36, gap: 0, from: 0.08, to: 0.58, maxCount: 8)),
+        ]),
+        AssetBlueprint("appliance.box", name: "Appliance", tags: ["appliance"], size: [0.6, 0.88, 0.6], parts: [
+            PartSpec(.box, .metal, x: .inset(0.005), y: Span(.lo(0.02), .hi()), z: Span(.lo(), .hi(0.02))),
+            PartSpec(.box, .primary, x: .inset(0.02), y: Span(.lo(0.06), .hi(0.14)), z: .fromHi(0.02)),
+            PartSpec(.cyl(14, axis: .z), .glass, x: .centeredFraction(0.55), y: Span(.f(0.25), .f(0.25, 0.33)), z: .fromHi(0.015, inset: -0.012)),
+            PartSpec(.box, .trim, x: .inset(0.02), y: Span(.hi(0.12), .hi(0.02)), z: .fromHi(0.03)),
+            PartSpec(.box, .glow, x: Span(.f(0.7), .f(0.82)), y: Span(.hi(0.09), .hi(0.05)), z: .fromHi(0.005, inset: -0.005)),
+        ]),
+        AssetBlueprint("appliance.tall", name: "Fridge", tags: ["fridge"], size: [0.75, 1.8, 0.72], parts: [
+            PartSpec(.box, .metal, y: Span(.lo(0.03), .hi()), z: Span(.lo(), .hi(0.04))),
+            PartSpec(.box, .primary, x: .inset(0.01), y: Span(.lo(0.04), .f(0.62)), z: .fromHi(0.04)),
+            PartSpec(.box, .primary, x: .inset(0.01), y: Span(.f(0.63), .hi(0.01)), z: .fromHi(0.04)),
+            PartSpec(.box, .trim, x: .fromHi(0.03, inset: 0.06), y: Span(.f(0.4), .f(0.58)), z: .fromHi(0.03, inset: -0.03)),
+            PartSpec(.box, .trim, x: .fromHi(0.03, inset: 0.06), y: Span(.f(0.67), .f(0.8)), z: .fromHi(0.03, inset: -0.03)),
+        ]),
+        AssetBlueprint("tv.panel", name: "TV", tags: ["tv"], size: [1.3, 0.75, 0.08], parts: [
+            PartSpec(.box, .trim, z: Span(.lo(), .hi())),
+            PartSpec(.box, .glass, x: .inset(0.02), y: .inset(0.02), z: .fromHi(0.006, inset: -0.004)),
+            PartSpec(.box, .glow, x: .fromHi(0.03, inset: 0.06), y: .fromLo(0.008, inset: 0.008), z: .fromHi(0.004, inset: -0.006)),
+        ]),
+        AssetBlueprint("plant.potted", name: "Potted plant", tags: ["plant"], size: [0.45, 1.1, 0.45], parts: [
+            PartSpec(.cyl(8, taper: 1.25), .accent, x: .centeredFraction(0.62), y: Span(.lo(), .f(0.26)), z: .centeredFraction(0.62)),
+            PartSpec(.cyl(8), .ground, x: .centeredFraction(0.66), y: Span(.f(0.24), .f(0.27)), z: .centeredFraction(0.66)),
+            PartSpec(.cyl(5), .bark, x: .centered(0.035), y: Span(.f(0.25), .f(0.6)), z: .centered(0.035)),
+            PartSpec(.rock(segments: 7, roughness: 0.18), .foliage, x: .full, y: Span(.f(0.45), .hi()), z: .full),
+            PartSpec(.rock(segments: 6, roughness: 0.2), .foliageAlt, x: Span(.f(0.05), .f(0.6)), y: Span(.f(0.36), .f(0.7)), z: Span(.f(0.4), .f(0.98))),
+        ]),
+        AssetBlueprint("stairs.ramp", name: "Stairs", tags: ["stairs"], size: [1.0, 2.0, 2.5], parts: [
+            PartSpec(.wedge, .primary),
+            PartSpec(.box, .trim, x: .fromLo(0.05), y: Span(.lo(), .hi()), z: .fromLo(0.05)),
+        ]),
+        AssetBlueprint("crate.box", name: "Crate", tags: ["clutter"], size: [0.5, 0.4, 0.4], parts: [
+            PartSpec(.box, .primary, x: .inset(0.015), y: .inset(0.015), z: .inset(0.015)),
+            PartSpec(.box, .secondary, x: .fromLo(0.04), mirrorX: true),
+            PartSpec(.box, .secondary, x: .inset(0.04), y: .fromLo(0.04), z: .fromLo(0.04), mirrorZ: true),
+            PartSpec(.box, .secondary, x: .inset(0.04), y: .fromHi(0.04), z: .fromLo(0.04), mirrorZ: true),
+        ]),
+    ]
+}

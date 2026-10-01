@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+    tags: ["*"]
+  pull_request:
+
+jobs:
+  macos:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build
+        run: swift build
+      - name: Test
+        run: swift test
+
+  platforms:
+    runs-on: macos-15
+    strategy:
+      fail-fast: false
+      matrix:
+        destination: ["generic/platform=iOS", "generic/platform=visionOS"]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build ${{ matrix.destination }}
+        run: xcodebuild -scheme DicyaninRoomWorlds -destination "${{ matrix.destination }}" build
