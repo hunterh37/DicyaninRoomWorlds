@@ -19,6 +19,24 @@ Scan a room on Vision Pro (or a LiDAR iPhone), then generate a themed 3D world f
 
 Neon City: ![](docs/screenshots/roomworlds-neon.png)
 
+## Demo
+
+[![DicyaninRoomWorlds promo video](docs/media/promo-poster.png)](docs/media/roomworlds-promo.mp4)
+
+Real app footage from Safari Walls and Timberline intercut with worlds rendered by this package ([MP4, 35 s](docs/media/roomworlds-promo.mp4)).
+
+## How it works
+
+![Pipeline: room, scan, analyze, generate](docs/how-it-works/01-pipeline.png)
+
+| Scan | Analyze |
+|---|---|
+| ![Labeled scan mesh](docs/how-it-works/02-scan.png) | ![Measured objects](docs/how-it-works/03-analyze.png) |
+| **Generate** | **Themes** |
+| ![Objects replaced by fitted assets](docs/how-it-works/04-generate.png) | ![Five themes on one room](docs/how-it-works/05-themes.png) |
+| **In the headset** | **Quick start** |
+| ![Scan and world from eye height](docs/how-it-works/06-headset.png) | ![Quick start code](docs/how-it-works/07-quickstart.png) |
+
 ## Features
 
 | Area | Feature | API | Platforms |
